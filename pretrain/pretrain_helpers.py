@@ -129,7 +129,7 @@ def _get_candidates_mask(inputs: pretrain_data.Inputs, vocab,
 
 
 def mask(config: configure_pretraining.PretrainingConfig,
-         inputs: pretrain_data.Inputs, mask_prob, proposal_distribution=1.0,
+         inputs: pretrain_data.Inputs, mask_prob, proposal_distribution=1,
          disallow_from_mask=None, already_masked=None):
   """Implementation of dynamic masking. The optional arguments aren't needed for
   BERT/ELECTRA and are from early experiments in "strategically" masking out
@@ -148,7 +148,7 @@ def mask(config: configure_pretraining.PretrainingConfig,
   Returns: a pretrain_data.Inputs with masking added
   """
   # Get the batch size, sequence length, and max masked-out tokens
-  N = config.max_predictions_per_seq
+  N = config.max_predictions_per_seq - 1
   B, L = modeling.get_shape_list(inputs.input_ids)
 
   # Find indices where masking out a token is allowed
@@ -173,7 +173,10 @@ def mask(config: configure_pretraining.PretrainingConfig,
   sample_prob = tf.stop_gradient(sample_prob)
   sample_logits = tf.log(sample_prob)
   masked_lm_positions = tf.random.categorical(
-      sample_logits, N, dtype=tf.int32)
+      sample_logits, int(N/3), dtype=tf.int32)
+  masked_lm_next_positions = masked_lm_positions + tf.ones_like(masked_lm_positions)
+  masked_lm_next_next_positions = masked_lm_next_positions + tf.ones_like(masked_lm_positions)
+  masked_lm_positions = tf.concat([masked_lm_positions, masked_lm_next_positions, masked_lm_next_next_positions], -1)
   masked_lm_positions *= tf.cast(masked_lm_weights, tf.int32)
 
   # Get the ids of the masked-out tokens
